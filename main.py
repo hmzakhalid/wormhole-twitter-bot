@@ -10,15 +10,16 @@ load_dotenv()
 
 TELEGRAM_TOKEN = os.getenv("TELEGRAM_TOKEN")
 TELEGRAM_CHANNEL_ID = os.getenv("TELEGRAM_CHANNEL_ID")
+TWITTER_USERNAME = os.getenv("TWITTER_USERNAME")
+api = API("accounts.db") 
 app = ApplicationBuilder().token(TELEGRAM_TOKEN).build()
 job_queue = app.job_queue
 
-
 async def post_to_telegram(app):
+    global api
     print(time.strftime("%H:%M:%S", time.localtime()), "Checking for new tweets...")
 
-    api = API("accounts.db") 
-    tweet = (await gather(api.user_tweets("1417845872436547587", limit=1)))[1]
+    tweet = (await gather(api.user_tweets(TWITTER_USERNAME, limit=1)))[1]
     # Check if it's not a retweet or reply
     if (tweet.retweetedTweet is None and tweet.inReplyToTweetId is None and tweet.inReplyToUser is None and tweet.quotedTweet is None):
         print(time.strftime("%H:%M:%S", time.localtime()), "New tweet found, posting to Telegram...")
@@ -63,11 +64,6 @@ async def post_to_telegram(app):
     else:
         print("Tweet is a reply or retweet, ignoring.")
 
-job_queue.run_once(post_to_telegram, 0)
-app.run_polling()
-
-# async def main():
-#     global app, job_queue
 set_log_level("DEBUG")  # set log level to debug to see more info
-
-# job_queue.run_repeating(post_to_telegram, interval=60)
+job_queue.run_repeating(post_to_telegram, interval=60)
+app.run_polling()
