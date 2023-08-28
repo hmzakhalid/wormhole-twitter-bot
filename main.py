@@ -20,6 +20,7 @@ async def post_to_telegram(app):
     print(time.strftime("%H:%M:%S", time.localtime()), "Checking for new tweets...")
 
     tweet = (await gather(api.user_tweets(TWITTER_USERNAME, limit=1)))[1]
+    print(tweet.rawContent)
     # Check if it's not a retweet or reply
     if (tweet.retweetedTweet is None and tweet.inReplyToTweetId is None and tweet.inReplyToUser is None and tweet.quotedTweet is None):
         print(time.strftime("%H:%M:%S", time.localtime()), "New tweet found, posting to Telegram...")
@@ -67,3 +68,4 @@ async def post_to_telegram(app):
 set_log_level("DEBUG")  # set log level to debug to see more info
 job_queue.run_repeating(post_to_telegram, interval=60)
 app.run_polling()
+
