@@ -8,7 +8,7 @@ from twscrape.logger import set_log_level
 from telegram.helpers import escape_markdown
 
 # Set up logging
-logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
+logging.basicConfig(level=logging.WARNING, format='%(asctime)s - %(levelname)s - %(message)s')
 logger = logging.getLogger()
 
 load_dotenv()
@@ -37,8 +37,8 @@ def mark_tweet_as_posted(tweet_id):
 
 async def post_to_telegram(app):
     global api
-
-    tweet = (await gather(api.user_tweets(TWITTER_USERNAME, limit=1)))[1]
+    # Get the latest 2 tweets
+    tweet = (await gather(api.user_tweets(TWITTER_USERNAME, limit=1)))[0]
 
     if is_tweet_posted(tweet.id_str):
         return
@@ -46,9 +46,12 @@ async def post_to_telegram(app):
     if (tweet.retweetedTweet is None and tweet.inReplyToTweetId is None 
         and tweet.inReplyToUser is None and tweet.quotedTweet is None):
 
-        content = tweet.rawContent.split(" ")
-        tweet_link = content.pop()
-        content = " ".join(content)
+        if tweet.links and tweet.links[0].tcourl:
+            tweet_link = tweet.links[0].tcourl
+        else:
+            tweet_link = tweet.url
+
+        content = tweet.rawContent.replace(tweet_link, "").strip()
         escaped_content = escape_markdown(content, version=1)
         msg = f"{escaped_content}\n\n🔗 [Twitter Link]({tweet_link})"
 
