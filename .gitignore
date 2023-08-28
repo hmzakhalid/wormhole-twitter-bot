@@ -1,3 +1,4 @@
 .env
 env
-accounts.db
+accounts*
+*.pem
