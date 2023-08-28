@@ -1,11 +1,8 @@
 import os
-import asyncio
 from dotenv import load_dotenv
-from telegram import Update
-from telegram.ext import ApplicationBuilder, ContextTypes
+from telegram.ext import ApplicationBuilder
 from twscrape import API, gather
 from twscrape.logger import set_log_level
-from twscrape.models import Tweet
 from telegram.helpers import escape_markdown
 import time
 
@@ -14,17 +11,32 @@ load_dotenv()
 TELEGRAM_TOKEN = os.getenv("TELEGRAM_TOKEN")
 TELEGRAM_CHANNEL_ID = os.getenv("TELEGRAM_CHANNEL_ID")
 app = ApplicationBuilder().token(TELEGRAM_TOKEN).build()
+job_queue = app.job_queue
 
-async def post_to_telegram():
-    global app
+
+async def post_to_telegram(app):
+    print(time.strftime("%H:%M:%S", time.localtime()), "Checking for new tweets...")
 
     api = API("accounts.db") 
     tweet = (await gather(api.user_tweets("1417845872436547587", limit=1)))[1]
     # Check if it's not a retweet or reply
-    if tweet.retweetedTweet is None and tweet.inReplyToTweetId is None:
+    if (tweet.retweetedTweet is None and tweet.inReplyToTweetId is None and tweet.inReplyToUser is None and tweet.quotedTweet is None):
+        print(time.strftime("%H:%M:%S", time.localtime()), "New tweet found, posting to Telegram...")
+        
         # Create the pretty message
-        msg = f"{tweet.user.username} (@{tweet.user.username}) posted:\n{tweet.rawContent}\n\n🔗 [Twitter Link]({tweet.url})"
-        msg = escape_markdown(msg, version=2)
+        content = tweet.rawContent
+        # Split the content and remove the last word
+        content = content.split(" ")
+        tweet_link = content.pop()
+        # Join the content back together
+        content = " ".join(content)
+
+        # Escape only the content part
+        escaped_content = escape_markdown(content, version=1)
+
+        msg = f"{escaped_content}\n\n🔗 [Twitter Link]({tweet_link})"
+
+        print(time.strftime("%H:%M:%S", time.localtime()), "Tweet content:\n", msg, "\n\n")
         try:
             # Handle media
             if tweet.media:
@@ -45,17 +57,17 @@ async def post_to_telegram():
 
             # Send text if there was no media or if there was additional text content
             if msg:
-                await app.bot.send_message(chat_id=TELEGRAM_CHANNEL_ID, text=msg, parse_mode="MarkdownV2")
+                await app.bot.send_message(chat_id=TELEGRAM_CHANNEL_ID, text=msg, parse_mode="Markdown")
         except Exception as e:
             print(f"Error while posting to Telegram: {e}")
     else:
         print("Tweet is a reply or retweet, ignoring.")
 
+job_queue.run_once(post_to_telegram, 0)
+app.run_polling()
 
-async def main():
-    global app
-    set_log_level("DEBUG")  # set log level to debug to see more info
-    app.job_queue.run_repeating(post_to_telegram, interval=60, first=0)
+# async def main():
+#     global app, job_queue
+set_log_level("DEBUG")  # set log level to debug to see more info
 
-if __name__ == "__main__":
-    asyncio.run(main())
+# job_queue.run_repeating(post_to_telegram, interval=60)

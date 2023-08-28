@@ -1,0 +1,8 @@
+version: '3.4'
+
+services:
+  wtttb:
+    image: wtttb
+    build:
+      context: .
+      dockerfile: ./Dockerfile
